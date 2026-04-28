@@ -85,7 +85,8 @@ CURVE_COLORS = ['#3b82f6', '#06b6d4', '#10b981', '#eab308', '#f97316', '#ef4444'
 def apply_chart_style(ax, title: str, ylabel: str, xlabel: str = None) -> None:
     """Apply uniform, high-contrast styling to Matplotlib axes."""
     ax.set_facecolor('#1e293b')
-    ax.set_title(title, color='#f8fafc', fontsize=13, fontweight='bold', pad=15)
+    if title:
+        ax.set_title(title, color='#f8fafc', fontsize=13, fontweight='bold', pad=15)
     ax.set_ylabel(ylabel, color='#cbd5e1', fontsize=10, fontweight='bold')
     if xlabel:
         ax.set_xlabel(xlabel, color='#cbd5e1', fontsize=10, fontweight='bold')
@@ -99,20 +100,22 @@ def apply_chart_style(ax, title: str, ylabel: str, xlabel: str = None) -> None:
         spine.set_edgecolor('#475569')
         spine.set_linewidth(1.2)
 
-def annotate_target(ax, x: float, y: float, text: str):
+def annotate_target(ax, x: float, y: float, text: str, align_right: bool = False):
     """Add a styled annotation box for target coordinate points."""
+    xytext = (-15, 15) if align_right else (15, 15)
     ax.annotate(
-        text, xy=(x, y), xytext=(15, 15), textcoords='offset points',
+        text, xy=(x, y), xytext=xytext, textcoords='offset points',
         color='#f8fafc', fontsize=9, fontweight='bold',
         bbox=dict(boxstyle="round,pad=0.4", fc="#0f172a", ec="#38bdf8", lw=1.5, alpha=0.9),
-        arrowprops=dict(arrowstyle="->", color="#38bdf8", lw=1.5, shrinkA=0, shrinkB=5)
+        arrowprops=dict(arrowstyle="->", color="#38bdf8", lw=1.5, shrinkA=0, shrinkB=5),
+        ha='right' if align_right else 'left'
     )
 
 def plot_vertical_chart(input_p: float, input_api: float, input_qg: float, result_d: float, input_t: float, x_lim: tuple, y_lim_top: tuple, y_lim_bot: tuple) -> plt.Figure:
-    fig, (ax_top, ax_bot) = plt.subplots(2, 1, figsize=(11, 14), gridspec_kw={'height_ratios': [1, 1.2]})
+    fig, (ax_top, ax_bot) = plt.subplots(2, 1, figsize=(11, 14), gridspec_kw={'height_ratios': [1, 1], 'hspace': 0}, sharex=True)
     fig.patch.set_facecolor('#0f172a')
 
-    p_range = np.linspace(50, 1600, 100)
+    p_range = np.linspace(14.7, 1600, 100)
     api_curves = [10, 20, 30, 40, 50, 60, 70]
     qg_curves = [10, 25, 50, 75, 100, 150, 200]
 
@@ -124,21 +127,25 @@ def plot_vertical_chart(input_p: float, input_api: float, input_qg: float, resul
 
     target_x = get_api_param(input_p, input_api, input_t)
 
-    # Target Point
+    # Target Point Top
     ax_top.scatter([target_x], [input_p], color='#38bdf8', s=120, alpha=0.3, zorder=9)
     ax_top.scatter([target_x], [input_p], color='#f8fafc', s=30, zorder=10, edgecolors='#38bdf8', linewidth=1.5)
     ax_top.axhline(y=input_p, color='#38bdf8', linestyle='--', linewidth=1.5, alpha=0.8)
     ax_top.axvline(x=target_x, color='#38bdf8', linestyle='--', linewidth=1.5, alpha=0.8)
 
-    annotate_target(ax_top, target_x, input_p, f"Target: {input_p} psia\nX: {target_x:.5f}")
-    apply_chart_style(ax_top, "NOMOGRAPH: LIQUID GRAVITY VS PRESSURE", "PRESSURE (PSIA)")
+    annotate_target(ax_top, target_x, input_p, f"Target: {input_p} psia\nX: {target_x:.5f}", align_right=True)
+    apply_chart_style(ax_top, "API 12J VERTICAL SEPARATOR SIZING NOMOGRAPH", "SEPARATOR OPERATING PRESSURE, PSI")
 
-    # Apply Limits
+    # Align Y-axis to the right for the top chart based on API 12J nomograph
+    ax_top.yaxis.tick_right()
+    ax_top.yaxis.set_label_position("right")
+    ax_top.tick_params(labelbottom=False)
+
     ax_top.set_xlim(x_lim[0], x_lim[1])
     ax_top.set_ylim(y_lim_top[0], y_lim_top[1])
     ax_top.legend(loc='upper right', facecolor='#0f172a', edgecolor='#334155', labelcolor='#cbd5e1', framealpha=0.9)
 
-    # Diameter vs Param
+    # Diameter vs Param (Bottom)
     x_range_bot = np.linspace(0.0001, 0.002, 150)
     for i, qg in enumerate(qg_curves):
         c = CURVE_COLORS[i % len(CURVE_COLORS)]
@@ -153,10 +160,9 @@ def plot_vertical_chart(input_p: float, input_api: float, input_qg: float, resul
     ax_bot.text(x_lim[0], result_d, f'{result_d:.2f} ', color='#38bdf8', fontsize=10, fontweight='bold', ha='right', va='center')
 
     annotate_target(ax_bot, target_x, result_d, f"Target: {result_d:.2f} inches")
-    apply_chart_style(ax_bot, "DIAMETER VS GAS FLOW RATE (MMCF/D)", "INSIDE DIAMETER (INCHES)", "API 12J PARAMETER (X)")
+    apply_chart_style(ax_bot, "", "SEPARATOR INSIDE DIAMETER, INCHES", "API 12J PARAMETER (X)")
 
-    # Apply Limits
-    ax_bot.set_xlim(x_lim[0], x_lim[1])
+    # Standard Y-axis orientation
     ax_bot.set_ylim(y_lim_bot[0], y_lim_bot[1])
     ax_bot.legend(loc='upper left', facecolor='#0f172a', edgecolor='#334155', labelcolor='#cbd5e1', framealpha=0.9, ncol=2)
 
@@ -164,10 +170,10 @@ def plot_vertical_chart(input_p: float, input_api: float, input_qg: float, resul
     return fig
 
 def plot_horizontal_charts(input_p: float, input_api: float, input_qg: float, input_vol: float, result_a: float, result_d: float, input_t: float, x_lim_param: tuple, x_lim_area: tuple, y_lim_top: tuple, y_lim_bot: tuple, y_lim_diam: tuple) -> tuple[plt.Figure, plt.Figure]:
-    fig_area, (ax_top, ax_bot) = plt.subplots(2, 1, figsize=(11, 14), gridspec_kw={'height_ratios': [1, 1.2]})
+    fig_area, (ax_top, ax_bot) = plt.subplots(2, 1, figsize=(11, 14), gridspec_kw={'height_ratios': [1, 1], 'hspace': 0}, sharex=True)
     fig_area.patch.set_facecolor('#0f172a')
 
-    p_range = np.linspace(50, 1600, 100)
+    p_range = np.linspace(14.7, 1600, 100)
     api_curves = [10, 30, 50, 70]
     qg_curves = [10, 25, 50, 75, 100, 150, 200]
     target_x = get_api_param(input_p, input_api, input_t)
@@ -183,10 +189,14 @@ def plot_horizontal_charts(input_p: float, input_api: float, input_qg: float, in
     ax_top.axhline(y=input_p, color='#38bdf8', linestyle='--', linewidth=1.5, alpha=0.8)
     ax_top.axvline(x=target_x, color='#38bdf8', linestyle='--', linewidth=1.5, alpha=0.8)
 
-    annotate_target(ax_top, target_x, input_p, f"P: {input_p} psia\nX: {target_x:.5f}")
-    apply_chart_style(ax_top, "VAPOR AREA NOMOGRAPH", "PRESSURE (PSIA)")
+    annotate_target(ax_top, target_x, input_p, f"P: {input_p} psia\nX: {target_x:.5f}", align_right=True)
+    apply_chart_style(ax_top, "API 12J HORIZONTAL SEPARATOR VAPOR AREA NOMOGRAPH", "SEPARATOR OPERATING PRESSURE, PSI")
 
-    # Apply Limits
+    # Align Y-axis to the right for the top chart based on API 12J nomograph
+    ax_top.yaxis.tick_right()
+    ax_top.yaxis.set_label_position("right")
+    ax_top.tick_params(labelbottom=False)
+
     ax_top.set_xlim(x_lim_param[0], x_lim_param[1])
     ax_top.set_ylim(y_lim_top[0], y_lim_top[1])
     ax_top.legend(loc='upper right', facecolor='#0f172a', edgecolor='#334155', labelcolor='#cbd5e1', framealpha=0.9)
@@ -206,16 +216,15 @@ def plot_horizontal_charts(input_p: float, input_api: float, input_qg: float, in
     ax_bot.text(x_lim_param[0], result_a, f'{result_a:.2f} ', color='#38bdf8', fontsize=10, fontweight='bold', ha='right', va='center')
 
     annotate_target(ax_bot, target_x, result_a, f"Area: {result_a:.2f} ft²")
-    apply_chart_style(ax_bot, "VAPOR DISENGAGING AREA VS GAS FLOW RATE", "AREA (SQ FT)", "API 12J PARAMETER (X)")
+    apply_chart_style(ax_bot, "", "VAPOR DISENGAGING AREA, SQUARE FEET", "API 12J PARAMETER (X)")
 
-    # Apply Limits
-    ax_bot.set_xlim(x_lim_param[0], x_lim_param[1])
+    # Standard Y-axis orientation
     ax_bot.set_ylim(y_lim_bot[0], y_lim_bot[1])
     ax_bot.legend(loc='upper left', facecolor='#0f172a', edgecolor='#334155', labelcolor='#cbd5e1', framealpha=0.9, ncol=2)
 
     fig_area.tight_layout(pad=3.0)
 
-    # Diameter Chart
+    # Diameter Chart (Standalone)
     fig_diam, ax3 = plt.subplots(figsize=(11, 7))
     fig_diam.patch.set_facecolor('#0f172a')
     a_range = np.linspace(0, 30, 150)
@@ -228,13 +237,13 @@ def plot_horizontal_charts(input_p: float, input_api: float, input_qg: float, in
 
     ax3.scatter([result_a], [result_d], color='#38bdf8', s=120, alpha=0.3, zorder=9)
     ax3.scatter([result_a], [result_d], color='#f8fafc', s=30, zorder=10, edgecolors='#38bdf8', linewidth=1.5)
-    ax3.axvline(x=result_a, color='#38bdf8', linestyle='--', linewidth=1.5, alpha=0.8)
+    ax_bot.axvline(x=result_a, color='#38bdf8', linestyle='--', linewidth=1.5, alpha=0.8)
     ax3.axhline(y=result_d, color='#38bdf8', linestyle='--', linewidth=1.5, alpha=0.8)
 
     ax3.text(x_lim_area[0], result_d, f'{result_d:.2f} ', color='#38bdf8', fontsize=10, fontweight='bold', ha='right', va='center')
 
     annotate_target(ax3, result_a, result_d, f"Diam: {result_d:.2f} in")
-    apply_chart_style(ax3, "HORIZONTAL SEPARATOR DIAMETER DETERMINATION", "DIAMETER (INCHES)", "VAPOR DISENGAGING AREA (SQ FT)")
+    apply_chart_style(ax3, "HORIZONTAL SEPARATOR DIAMETER DETERMINATION", "SEPARATOR INSIDE DIAMETER, INCHES", "VAPOR DISENGAGING AREA, SQUARE FEET")
 
     # Apply Limits
     ax3.set_xlim(x_lim_area[0], x_lim_area[1])
@@ -270,9 +279,9 @@ with tab1:
         st.markdown("**X-Axis**")
         c_x1, c_x2 = st.columns(2)
         with c_x1:
-            v_x_max = st.number_input("X-Axis Max (API Param)", value=0.0015, format="%.5f", key="v_x_max")
+            v_x_min = st.number_input("X-Axis Min (API Param)", value=0.00014, format="%.5f", key="v_x_min")
         with c_x2:
-            v_x_min = st.number_input("X-Axis Min (API Param)", value=-0.00015, format="%.5f", key="v_x_min")
+            v_x_max = st.number_input("X-Axis Max (API Param)", value=0.0009, format="%.5f", key="v_x_max")
 
         st.markdown("**Y-Axis**")
         c_y1, c_y2 = st.columns(2)
@@ -280,8 +289,8 @@ with tab1:
             v_y_max_top = st.number_input("Top Chart Y Max (Pressure)", value=1600.0, step=100.0, key="v_y_max_top")
             v_y_min_top = st.number_input("Top Chart Y Min (Pressure)", value=0.0, step=100.0, key="v_y_min_top")
         with c_y2:
-            v_y_max_bot = st.number_input("Bottom Chart Y Max (Diameter)", value=400.0, step=10.0, key="v_y_max_bot")
-            v_y_min_bot = st.number_input("Bottom Chart Y Min (Diameter)", value=0.0, step=10.0, key="v_y_min_bot")
+            v_y_max_bot = st.number_input("Bottom Chart Y Max (Diameter)", value=112.0, step=10.0, key="v_y_max_bot")
+            v_y_min_bot = st.number_input("Bottom Chart Y Min (Diameter)", value=10.0, step=10.0, key="v_y_min_bot")
 
     if st.button("🔍 Generate Vertical Analysis", type="primary"):
         diam = calc_vert_diam_math(v_pres, v_api, v_flow, v_temp)
@@ -292,7 +301,7 @@ with tab1:
 
         fig = plot_vertical_chart(
             v_pres, v_api, v_flow, diam, v_temp,
-            x_lim=(v_x_max, v_x_min),
+            x_lim=(v_x_min, v_x_max),
             y_lim_top=(v_y_min_top, v_y_max_top),
             y_lim_bot=(v_y_min_bot, v_y_max_bot)
         )
@@ -317,13 +326,13 @@ with tab2:
         st.markdown("**X-Axis**")
         c_x1, c_x2, c_x3, c_x4 = st.columns(4)
         with c_x1:
-            h_x_max = st.number_input("Area Chart X Max", value=0.0018, format="%.5f", key="h_x_max")
+            h_x_min = st.number_input("Area Chart X Min", value=0.00027, format="%.5f", key="h_x_min")
         with c_x2:
-            h_x_min = st.number_input("Area Chart X Min", value=-0.0001, format="%.5f", key="h_x_min")
+            h_x_max = st.number_input("Area Chart X Max", value=0.00063, format="%.5f", key="h_x_max")
         with c_x3:
-            d_x_max = st.number_input("Diam Chart X Max", value=34.0, format="%.1f", key="d_x_max")
+            d_x_min = st.number_input("Diam Chart X Min", value=0.00018, format="%.1f", key="d_x_min")
         with c_x4:
-            d_x_min = st.number_input("Diam Chart X Min", value=-2.0, format="%.1f", key="d_x_min")
+            d_x_max = st.number_input("Diam Chart X Max", value=30.0, format="%.1f", key="d_x_max")
 
         st.markdown("**Y-Axis**")
         c_y1, c_y2, c_y3 = st.columns(3)
@@ -331,11 +340,11 @@ with tab2:
             h_y_max_top = st.number_input("Area Top Y Max (Pressure)", value=1600.0, step=100.0, key="h_y_max_top")
             h_y_min_top = st.number_input("Area Top Y Min (Pressure)", value=0.0, step=100.0, key="h_y_min_top")
         with c_y2:
-            h_y_max_bot = st.number_input("Area Bot Y Max (Area)", value=150.0, step=10.0, key="h_y_max_bot")
-            h_y_min_bot = st.number_input("Area Bot Y Min (Area)", value=0.0, step=10.0, key="h_y_min_bot")
+            h_y_max_bot = st.number_input("Area Bot Y Max (Area)", value=29.0, step=5.0, key="h_y_max_bot")
+            h_y_min_bot = st.number_input("Area Bot Y Min (Area)", value=0.0, step=5.0, key="h_y_min_bot")
         with c_y3:
-            d_y_max = st.number_input("Diam Y Max (Diameter)", value=150.0, step=10.0, key="d_y_max")
-            d_y_min = st.number_input("Diam Y Min (Diameter)", value=0.0, step=10.0, key="d_y_min")
+            d_y_max = st.number_input("Diam Y Max (Diameter)", value=100.0, step=10.0, key="d_y_max")
+            d_y_min = st.number_input("Diam Y Min (Diameter)", value=20.0, step=10.0, key="d_y_min")
 
     if st.button("🔍 Generate Horizontal Analysis", type="primary"):
         area = calc_vapor_area_math(h_pres, h_api, h_flow, h_temp)
@@ -348,7 +357,7 @@ with tab2:
 
         fig_area, fig_diam = plot_horizontal_charts(
             h_pres, h_api, h_flow, h_liq, area, diam, h_temp,
-            x_lim_param=(h_x_max, h_x_min),
+            x_lim_param=(h_x_min, h_x_max),
             x_lim_area=(d_x_min, d_x_max),
             y_lim_top=(h_y_min_top, h_y_max_top),
             y_lim_bot=(h_y_min_bot, h_y_max_bot),
@@ -362,7 +371,12 @@ with tab2:
 with tab3:
     st.subheader("Chart Generation Methodology")
     st.markdown("""
-    ### 1. Core API 12J Parameter Calculation
+    ### 1. Equation Origins and API 12J Reference
+    The formulas utilized in this application are **custom empirical mathematical regressions** formulated strictly to replicate the physical sizing nomographs published in **API Specification 12J (Specification for Oil and Gas Separators)**. 
+
+    They are curve-fitted mathematical models derived directly from the API 12J charts (as seen in Appendix C sizing methodologies) to facilitate digital calculations without requiring the manual, visual interpolation of the printed nomograph figures.
+
+    ### 2. Core API 12J Parameter Calculation
     The fundamental parameter $X$ governing separation sizing is derived from phase densities. This defines the horizontal axis connecting the nomograph segments.
 
     $$X = \\frac{1}{P} \\sqrt{\\frac{\\rho_g}{\\rho_l - \\rho_g}}$$
@@ -372,8 +386,8 @@ with tab3:
     * $\\rho_g$ = Gas Density ($lb/ft^3$), calculated via standard ideal gas law with Z-factor correction.
     * $\\rho_l$ = Liquid Density ($lb/ft^3$), derived from API gravity.
 
-    ### 2. Regression Curve Equations
-    The visible chart curves are plotted dynamically by evaluating empirical regression equations derived from API 12J over continuous linear data spaces (`np.linspace`).
+    ### 3. Regression Curve Equations (Nomograph Replication)
+    The visible chart curves are plotted dynamically by evaluating the following developed equations over continuous linear data spaces (`np.linspace`).
 
     **Vertical Separator Diameter ($D_v$)**
     $$D_v = [311.0 + 101,437.0 \\cdot (X - 0.0003673)] \\cdot \\sqrt{Q_g \\cdot X}$$
@@ -385,14 +399,10 @@ with tab3:
     $$D_h = 13.54 \\cdot \\sqrt{A + (Vol \\cdot V_{ratio})}$$
     *Note: $V_{ratio}$ is an interpolated empirical ratio based on liquid volume capacity ($Vol$).*
 
-    ### 3. Plotting Engine (Matplotlib)
-    Static pixel mapping of scanned images was eliminated. The system utilizes `matplotlib` to render the equations purely mathematically:
-    1.  Generates a parameter space for pressure ($50-1600$ psia) and $X$ ($0.0001-0.002$).
-    2.  Plots distinct lines for predefined $Q_g$ (gas flow) and $API$ (liquid gravity) constants by evaluating the regression equations.
-    3.  Calculates the user's specific target intersection coordinates based on input parameters.
-    4.  Overlays point markers and dashed reference lines exactly at calculated $(x, y)$ coordinates.
+    ### 4. Plotting Engine Configuration
+    The layout and dual-axis alignment of the generated charts are programmed to strictly mirror the physical layout of the API 12J specification nomographs (e.g., pressure parameter originating on the right Y-axis, cross-referencing downwards to the lower left Y-axis calculations).
     """)
 
 st.markdown("---")
-st.info("**Methodology:** Calculations are based on API Spec 12J regression curves for standard gas-liquid separation. Standard gas SG=0.65 and Z=0.85 are assumed.")
+st.info("**Methodology:** Calculations are driven by mathematically regressed models of API Spec 12J separation sizing nomographs. Standard gas SG=0.65 and Z=0.85 are assumed.")
 st.caption("⚠️ Verification against specific vendor pressure vessel drawings and liquid level controls is required for final fabrication.")
